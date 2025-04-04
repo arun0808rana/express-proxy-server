@@ -1,22 +1,38 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const url = require("url");
 
 function jwtMiddleware(req, res, next) {
   const JWT_SECRET = process.env.JWT_SECRET;
-  
-  const authHeader = req.headers['authorization'];
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Unauthorized: No token provided' });
+  const authHeader = req.headers["authorization"];
+  const tokenQueryParam = req.query.token;
+
+  if (!authHeader && !tokenQueryParam) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
   }
 
-  const token = authHeader.split(' ')[1];
+  let token;
+
+  if (authHeader) {
+    token = authHeader.split(" ")[1];
+    console.info("--Basic Token", token);
+  } else if (tokenQueryParam) {
+    token = tokenQueryParam;
+    console.info("--Presigned Token", token);
+
+    // Remove only `token` query param
+    const parsedUrl = url.parse(req.url, true);
+    delete parsedUrl.query.token;
+    delete parsedUrl.search; // force regeneration of query string
+    req.url = url.format(parsedUrl);
+    console.log('--req.url', req.url);
+  }
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(403).json({ message: 'Forbidden: Invalid token' });
+      return res.status(403).json({ message: "Forbidden: Invalid token" });
     }
 
-    req.user = decoded; // You now have access to the payload
     next();
   });
 }
